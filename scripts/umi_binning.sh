@@ -573,6 +573,8 @@ $GAWK \
     }
 
     for (u in umi_n_raw){
+      sam1[u] = rof_sub_pos_n[u] + umi_ro_plus[u]
+      sam2[u] = rof_sub_neg_n[u] + umi_ro_neg[u]
       if (umi_n_raw[u] == 1){
         umi_n[u] = 1
         umi_ro_plus[u] = 1
@@ -582,9 +584,8 @@ $GAWK \
         ume_check[u] = "ume_ok"
         bcr[u] = 1
         bcr_check[u] = "bcr_ok"
-        print u, umi_n_raw[u], umi_n[u], umi_ro_plus[u], umi_ro_neg[u], \
-        rof_sub_pos_n[u] + umi_ro_plus[u], rof_sub_neg_n[u] + umi_ro_neg[u], rof_check[u], \
-        UME_MEAN[u], UME_SD[u], ume_check[u], bcr[u], bcr_check[u]\
+        sam1[u] = 10000
+        sam2[u] = 10000
       }
     }
 
@@ -595,7 +596,7 @@ $GAWK \
       "bcr_filter" > BD"/umi_binning_stats.txt"
     for (u in umi_n){
       print u, umi_n_raw[u], umi_n[u], umi_ro_plus[u], umi_ro_neg[u], \
-        rof_sub_pos_n[u] + umi_ro_plus[u], rof_sub_neg_n[u] + umi_ro_neg[u], rof_check[u], \
+        sam1[u], sam2[u], rof_check[u], \
         UME_MEAN[u], UME_SD[u], ume_check[u], bcr[u], bcr_check[u]\
         > BD"/umi_binning_stats.txt"
     }
