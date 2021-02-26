@@ -257,7 +257,7 @@ $GAWK \
   (FILENAME == UC && FNR%2==1){
     NAME=substr($1,2)
     if (NAME in CLUSTER){
-      if (CLUSTER[NAME]+0 > 2){
+      if (CLUSTER[NAME]+0 > 0){
         SIZE=CLUSTER[NAME]
         gsub(";.*", "", NAME)
         print ">" NAME ";size=" SIZE ";"
@@ -310,7 +310,7 @@ paste <(cat $UMI_DIR/umi12cf.fa | paste - - ) \
       s2arc[a[2]] = s2rc;
     } END {
       for (i in u){
-        keep="no";
+        keep="yes";
         if (g1[s1a[i]] == i && g2[s2a[i]] == i && g1[s1arc[i]] == i && g2[s2arc[i]] == i && s1a[i] != s1arc[i]){
           keep="yes";
           print ">"i";"u[i]"\n"s1a[i]s2a[i] > UD"/umi_ref.fa";
@@ -371,12 +371,12 @@ $BWA index $BINNING_DIR/reads_tf_umi2.fa
 $BWA aln $BINNING_DIR/reads_tf_umi1.fa $BINNING_DIR/umi_ref_b1.fa \
   -n 3 -t $THREADS -N > $BINNING_DIR/umi1_map.sai
 $BWA samse -n 10000000 $BINNING_DIR/reads_tf_umi1.fa $BINNING_DIR/umi1_map.sai\
-  $BINNING_DIR/umi_ref_b1.fa | $SAMTOOLS view -F 20 - > $BINNING_DIR/umi1_map.sam
+  $BINNING_DIR/umi_ref_b1.fa | $SAMTOOLS view - > $BINNING_DIR/umi1_map.sam
 
 $BWA aln $BINNING_DIR/reads_tf_umi2.fa $BINNING_DIR/umi_ref_b2.fa \
   -n 3 -t $THREADS -N > $BINNING_DIR/umi2_map.sai
 $BWA samse -n 10000000 $BINNING_DIR/reads_tf_umi2.fa $BINNING_DIR/umi2_map.sai\
-  $BINNING_DIR/umi_ref_b2.fa | $SAMTOOLS view -F 20 - > $BINNING_DIR/umi2_map.sam
+  $BINNING_DIR/umi_ref_b2.fa | $SAMTOOLS view - > $BINNING_DIR/umi2_map.sam
 
 # UMI binning and filtering
 
@@ -389,7 +389,7 @@ $GAWK \
   -v BIN_CLUSTER_RATIO="$BIN_CLUSTER_RATIO" \
   '
   NR==1 {
-    print "[" strftime("%T") "] ### Read-UMI match filtering ###" > "/dev/stderr";
+    print "[" strftime("%T") "] ### Read-UMI match filteringssss ###" > "/dev/stderr";
     print "[" strftime("%T") "] Reading UMI1 match file..." > "/dev/stderr";
   }
   # Read UMI match file
@@ -399,7 +399,8 @@ $GAWK \
       # Find NM field and remove prefix (primary hit err)
       if($i ~ /^NM:i:/){sub("NM:i:", "", $i); perr = $i};
       # Find secondary hit field, remove prefix and split hits
-      if($i ~ /^XA:Z:/){sub("XA:Z:", "", $i); split($i, shits, ";")};
+      if($20 && $i ~ /^XA:Z:/){sub("XA:Z:", "", $i); split($i, shits, ";")}
+      else {split($3",+"$4","$6",0", shits, ";")};
     }
     # Add primary mapping to hit list
     err1[$1][$3]=perr;
@@ -415,6 +416,8 @@ $GAWK \
     }
     next;
   }
+
+
   FNR==1 {
    print "[" strftime("%T") "] Reading UMI2 match file..." > "/dev/stderr";
   }
@@ -425,7 +428,8 @@ $GAWK \
       # Find NM field and remove prefix (primary hit err)
       if($i ~ /^NM:i:/){sub("NM:i:", "", $i); perr = $i};
       # Find secondary hit field and remove prefix
-      if($i ~ /^XA:Z:/){sub("XA:Z:", "", $i); split($i, shits, ";")};
+      if($20 && $i ~ /^XA:Z:/){sub("XA:Z:", "", $i); split($i, shits, ";")}
+      else {split($3",+"$4","$6",0", shits, ";")};
     }
     # Add primary mapping to hit list
     err2[$1][$3]=perr;
@@ -443,7 +447,7 @@ $GAWK \
   } END {
     print "[" strftime("%T") "] UMI match filtering..." > "/dev/stderr"; 
     # Filter reads based on UMI match error
-    for (umi in err1){    
+    for (umi in err1){ 
       for (read in err1[umi]){
         # Define vars
         e1 = err1[umi][read];
@@ -464,6 +468,10 @@ $GAWK \
         }
       }
     }
+
+
+
+
     print "[" strftime("%T") "] Read orientation filtering..." > "/dev/stderr";
     # Count +/- strand reads
     for (s in match_umi){
@@ -485,7 +493,7 @@ $GAWK \
     # Calculate read orientation fraction
     for (u in umi_ro_plus){
       # Check read orientation fraction
-      if (umi_ro_plus[u] > 1 && umi_ro_neg[u] > 1){
+      if (umi_ro_plus[u] >= 0 && umi_ro_neg[u] >= 0){
         if (umi_ro_plus[u]/(umi_ro_neg[u]+umi_ro_plus[u]) < RO_FRAC ){
           rof_check[u]="rof_subset"
           rof_sub_neg_n[u] = umi_ro_plus[u]*(1/RO_FRAC-1)
@@ -499,9 +507,19 @@ $GAWK \
           rof_sub_neg_n[u]=MAX_BIN_SIZE
           rof_sub_pos_n[u]=MAX_BIN_SIZE
         }
+      } else if (umi_ro_plus[u] > 0) {
+        umi_ro_neg[u] = 0
+        rof_sub_pos_n[u] = MAX_BIN_SIZE
+        rof_sub_neg_n[u] = 0
+
+      } else if (umi_ro_neg[u] > 0 ){
+        umi_ro_plus[u] = 0  
+        rof_sub_pos_n[u] = 0
+        rof_sub_neg_n[u] = MAX_BIN_SIZE
       } else {
         rof_check[u]="rof_fail"
       }
+
     }
     
     # Subset reads
@@ -531,6 +549,7 @@ $GAWK \
     }
 
     # Check UMI match error
+    # Checked
     for (u in umi_n){
       UME_MEAN[u] = umi_me_sum[u]/umi_n[u]
       UME_SD[u] = sqrt((umi_me_sq[u]-umi_me_sum[u]^2/umi_n[u])/umi_n[u])
@@ -550,6 +569,22 @@ $GAWK \
         bcr_check[u] = "bcr_fail"
       } else {
         bcr_check[u] = "bcr_ok"
+      }
+    }
+
+    for (u in umi_n_raw){
+      if (umi_n_raw[u] == 1){
+        umi_n[u] = 1
+        umi_ro_plus[u] = 1
+        rof_check[u] = "rof_ok"
+        UME_MEAN[u] = 0
+        UME_SD[u] = 0
+        ume_check[u] = "ume_ok"
+        bcr[u] = 1
+        bcr_check[u] = "bcr_ok"
+        print u, umi_n_raw[u], umi_n[u], umi_ro_plus[u], umi_ro_neg[u], \
+        rof_sub_pos_n[u] + umi_ro_plus[u], rof_sub_neg_n[u] + umi_ro_neg[u], rof_check[u], \
+        UME_MEAN[u], UME_SD[u], ume_check[u], bcr[u], bcr_check[u]\
       }
     }
 
